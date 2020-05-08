@@ -1,0 +1,30 @@
+{
+  "name": "music-eye-ui",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "nodemon --watch server --delay 1 server/index.js",
+    "build": "next build",
+    "start": "cross-env NODE_ENV=production node server",
+    "format": "prettier \"**/*.js\" --write"
+  },
+  "dependencies": {
+    "cross-env": "^7.0.2",
+    "express": "^4.17.1",
+    "next": "latest",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
+    "recordrtc": "^5.5.9",
+    "socket.io": "^2.3.0",
+    "socket.io-client": "^2.3.0",
+    "three": "^0.116.1"
+  },
+  "devDependencies": {
+    "babel-eslint": "^10.1.0",
+    "babel-plugin-import": "^1.13.0",
+    "babel-plugin-module-resolver": "^4.0.0",
+    "eslint": "^6.8.0",
+    "eslint-plugin-react": "^7.19.0",
+    "nodemon": "^2.0.3",
+    "prettier": "^2.0.5"
+  }
+}
