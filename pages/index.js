@@ -1,28 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import io from 'socket.io-client';
+import React from 'react';
+import Head from 'next/head';
+import dynamic from 'next/dynamic';
 
-const useConnection = () => {
-  const [connected, setConnected] = useState(false);
-  useEffect(() => {
-    const socket = io({
-      transports: ['websocket'],
-    });
-    socket.on('connect', () => {
-      console.log('[Connected]');
-      setConnected(true);
-    });
-    socket.on('disconnect', () => {
-      console.log('[Disconnected]');
-      setConnected(false);
-    });
-    return () => socket.close();
-  }, []);
-  return { connected };
+const Main = dynamic(() => import('../components/Main'), { ssr: false });
+
+export default () => {
+  return (
+    <>
+      <Head>
+        <title>Music Eye</title>
+      </Head>
+      <Main />
+    </>
+  );
 };
-
-const MainPage = () => {
-  const { connected } = useConnection();
-  return <div>Music Eye UI {connected && ' - WebSocket Connected'}</div>;
-};
-
-export default MainPage;

@@ -9,4 +9,4 @@ COPY . .
 RUN yarn build && yarn --production
 
 ENV NODE_ENV production
-CMD ["node", "server.js"]
+CMD ["node", "server/index.js"]
