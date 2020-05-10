@@ -1,19 +1,33 @@
 import { useContext, createContext } from 'react';
 import Soundfont from 'soundfont-player';
+import AsyncLock from 'async-lock';
 
 export class Player {
   constructor() {
-    this.ac = new AudioContext();
+    this.lock = new AsyncLock();
+    this.ac = new (window.AudioContext || window.webkitAudioContext)();
     this.startTime = null;
     this.maxTime = 0;
     this.now = 0;
     this.notes = [];
+    this.activeNotes = [];
+    this.activeRecords = [];
     this.instrument = null;
-    this.initPromise = Soundfont.instrument(this.ac, '/clavinet-mp3.js').then(
-      (clavinet) => {
-        this.instrument = clavinet;
+    this.initPromise = Soundfont.instrument(this.ac, '/instrument.js').then(
+      (instrument) => {
+        this.instrument = instrument;
       },
     );
+
+    if (this.ac.state === 'suspended') {
+      const unlock = () => {
+        if (this.ac) {
+          this.ac.resume();
+        }
+      };
+      document.body.addEventListener('mousedown', unlock, false);
+      document.body.addEventListener('touchstart', unlock, false);
+    }
   }
 
   get started() {
@@ -32,69 +46,110 @@ export class Player {
     return this.currentTime >= this.maxTime;
   }
 
-  get instrumentEvents() {
-    return this.notes
-      .filter((item) => this.now <= item[0])
-      .map((item) => ({
-        time: item[0] - this.now,
-        note: item[1],
-        duration: item[2],
-      }));
+  instrumentEvents(since) {
+    return this.notes.filter((item) => {
+      return item[0] >= since && item[0] <= since + 6;
+    });
+  }
+
+  refresh() {
+    return this.lock.acquire('core_op', () => {
+      this.rebuildBatch();
+      if (this.started) {
+        const currentTime = this.currentTime;
+        this.activeRecords = this.activeRecords.filter((record) => {
+          return record[0][0] >= currentTime;
+        });
+        const newNotes = this.instrumentEvents(currentTime);
+        this.activeRecords = this.activeRecords
+          .filter((record) => {
+            const p = newNotes.indexOf(record[0]);
+            if (p < 0) {
+              record[1].stop();
+              return false;
+            } else {
+              newNotes[p] = null;
+              return true;
+            }
+          })
+          .concat(
+            newNotes.filter(Boolean).map((item) => {
+              return [
+                item,
+                this.instrument.start(
+                  item[1],
+                  this.ac.currentTime + item[0] - currentTime,
+                  {
+                    duration: item[2],
+                    ...(item[3]
+                      ? {
+                          gain: item[3] / 128,
+                        }
+                      : {}),
+                  },
+                ),
+              ];
+            }),
+          );
+      }
+    });
+  }
+
+  rebuildBatch() {
+    this.activeNotes = this.notes.filter((item) => {
+      return (
+        item[0] >= this.currentTime - 3 && item[0] <= this.currentTime + 12
+      );
+    });
   }
 
   async start() {
-    if (this.started) return;
-    if (this.ended) {
-      await this.reset();
-    }
-    await this.initPromise;
-    this.startTime = this.ac.currentTime;
-    this.instrument.schedule(this.startTime, this.instrumentEvents);
-    this.instrument.start();
-  }
-
-  async waitCurrentNoteDone() {
-    const currentTime = this.currentTime;
-    const targetTime = this.notes.reduce((t, item) => {
-      const s = item[0];
-      const e = item[0] + item[2];
-      if (currentTime > s && currentTime <= e) {
-        t = Math.max(t, e);
-      }
-      return t;
-    }, currentTime);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => resolve(targetTime), (targetTime - currentTime) * 1000);
+    return this.lock.acquire('core_op', async () => {
+      if (this.started) return;
+      if (this.ended) this.reset();
+      await this.initPromise;
+      this.startIntervalId = setInterval(() => {
+        if (this.started) {
+          this.refresh();
+        }
+      }, 3000 + Math.random() * 3000);
+      this.startTime = this.ac.currentTime;
+      this.activeRecords = [];
+      this.refresh();
     });
   }
 
   async pause() {
-    if (!this.started) return;
-    this.now = await this.waitCurrentNoteDone();
-    this.startTime = null;
-    this.instrument.stop();
+    return this.lock.acquire('core_op', async () => {
+      if (!this.started) return;
+      this.now = this.currentTime;
+      this.startTime = null;
+      clearInterval(this.startIntervalId);
+      this.activeRecords = this.activeRecords.filter((record) => {
+        return record[0][0] >= this.now;
+      });
+      this.activeRecords.forEach((record) => record[1].disconnect());
+    });
   }
 
   async updateNotes(notes) {
-    const started = this.started;
-    if (started) await this.pause();
     this.notes = notes;
     this.maxTime = notes.reduce((t, item) => {
       t = Math.max(t, item[0] + item[2]);
       return t;
     }, 0);
-    this.maxTime = Math.floor(this.maxTime * 10) / 10;
-    if (started) await this.start();
+    this.maxTime = Math.ceil(this.maxTime * 10) / 10;
+    return this.refresh();
   }
 
   async reset() {
-    await this.pause();
-    this.now = 0;
+    await this.moveTo(0);
   }
 
   async moveTo(p) {
     await this.pause();
     this.now = p;
+    this.rebuildBatch();
   }
 }
 

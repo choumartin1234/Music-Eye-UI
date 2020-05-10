@@ -21,3 +21,11 @@ yarn dev
 Open your browser and visit `http://localhost:3000`, there you will see the main page.
 
 Feel free to edit any files, and it is highly recommended using [VSCode](https://code.visualstudio.com/) as your editor.
+
+## Deployment
+
+Just make use of our `Dockerfile`.
+
+## License
+
+GNU General Public License (GPL) v3
