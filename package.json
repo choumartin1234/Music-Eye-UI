@@ -5,7 +5,7 @@
   "private": true,
   "author": "Bohan Chen <chacyume@gmail.com>",
   "scripts": {
-    "dev": "nodemon --watch server --delay 1 server/index.js",
+    "dev": "nodemon --watch server --watch utils --delay 1 server/index.js",
     "build": "next build",
     "start": "cross-env NODE_ENV=production node server",
     "format": "prettier \"**/*.js\" --write"
@@ -17,10 +17,12 @@
     "axios": "^0.19.2",
     "color": "^3.1.2",
     "cookie-session": "^1.4.0",
+    "cos-nodejs-sdk-v5": "^2.5.20",
     "cross-env": "^7.0.2",
     "dayjs": "^1.8.26",
     "dotenv": "^8.2.0",
     "express": "^4.17.1",
+    "express-fileupload": "^1.1.7-alpha.3",
     "next": "latest",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",

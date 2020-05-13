@@ -7,6 +7,7 @@ export class Player {
     this.lock = new AsyncLock();
     this.ac = new (window.AudioContext || window.webkitAudioContext)();
     this.startTime = null;
+    this.muted = false;
     this.maxTime = 0;
     this.now = 0;
     this.notes = [];
@@ -57,15 +58,19 @@ export class Player {
       this.rebuildBatch();
       if (this.started) {
         const currentTime = this.currentTime;
-        this.activeRecords = this.activeRecords.filter((record) => {
-          return record[0][0] >= currentTime;
-        });
-        const newNotes = this.instrumentEvents(currentTime);
+        if (this.muted) {
+          this.activeRecords = [];
+        } else {
+          this.activeRecords = this.activeRecords.filter((record) => {
+            return record[0][0] >= currentTime;
+          });
+        }
+        const newNotes = !this.muted ? this.instrumentEvents(currentTime) : [];
         this.activeRecords = this.activeRecords
           .filter((record) => {
             const p = newNotes.indexOf(record[0]);
             if (p < 0) {
-              record[1].stop();
+              record[1].disconnect();
               return false;
             } else {
               newNotes[p] = null;
@@ -74,6 +79,7 @@ export class Player {
           })
           .concat(
             newNotes.filter(Boolean).map((item) => {
+              const gain = item[3] ? item[3] / 128 : undefined;
               return [
                 item,
                 this.instrument.start(
@@ -81,11 +87,7 @@ export class Player {
                   this.ac.currentTime + item[0] - currentTime,
                   {
                     duration: item[2],
-                    ...(item[3]
-                      ? {
-                          gain: item[3] / 128,
-                        }
-                      : {}),
+                    gain,
                   },
                 ),
               ];
@@ -98,7 +100,8 @@ export class Player {
   rebuildBatch() {
     this.activeNotes = this.notes.filter((item) => {
       return (
-        item[0] >= this.currentTime - 3 && item[0] <= this.currentTime + 12
+        (item[0] >= this.currentTime && item[0] <= this.currentTime + 12) ||
+        (item[0] <= this.currentTime && this.currentTime <= item[0] + item[2])
       );
     });
   }
@@ -125,9 +128,11 @@ export class Player {
       this.now = this.currentTime;
       this.startTime = null;
       clearInterval(this.startIntervalId);
+      /*
       this.activeRecords = this.activeRecords.filter((record) => {
         return record[0][0] >= this.now;
       });
+      */
       this.activeRecords.forEach((record) => record[1].disconnect());
     });
   }
@@ -139,6 +144,11 @@ export class Player {
       return t;
     }, 0);
     this.maxTime = Math.ceil(this.maxTime * 10) / 10;
+    return this.refresh();
+  }
+
+  async setMuted(val) {
+    this.muted = val;
     return this.refresh();
   }
 
